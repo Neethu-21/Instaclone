@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 
-const IMGBB_KEY = "668793f8372c594c8dc0efe3410ededc";
+const IMGBB_KEY = process.env.REACT_APP_IMGBB_KEY;
+
 
 export default function Feed({ user, openProfile }) {
   if (!user) return null;

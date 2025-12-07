@@ -8,7 +8,7 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState(null);
 
-  const IMGBB_KEY = "668793f8372c594c8dc0efe3410ededc";
+  const IMGBB_KEY = process.env.REACT_APP_IMGBB_KEY;
 
   // upload avatar
   const uploadAvatar = async () => {
