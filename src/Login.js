@@ -1,48 +1,40 @@
-// Login.js
+// Login.js — Username + Password only (no email)
 import React, { useState } from "react";
 import { supabase } from "./supabase";
 
 export default function Login({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) return alert("Enter email & password");
-    setLoading(true);
+  const signup = async () => {
+    if (!username || !password) return alert("Enter username & password");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+    const { data: exists } = await supabase
+      .from("accounts")
+      .select("username")
+      .eq("username", username);
+
+    if (exists.length) return alert("Username already exists");
+
+    await supabase.from("accounts").insert({
+      username,
       password,
+      avatar: "",
     });
-
-    setLoading(false);
-
-    if (error) {
-      alert("Incorrect email or password");
-      return;
-    }
-
-    onLogin(data.user);  // <-- IMPORTANT
-  };
-
-  const handleSignup = async () => {
-    if (!email || !password) return alert("Enter email & password");
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
 
     alert("Signup successful — now login");
+  };
+
+  const login = async () => {
+    const { data } = await supabase
+      .from("accounts")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password);
+
+    if (!data || !data.length) return alert("Incorrect username or password");
+
+    onLogin(data[0]); // logged in user
   };
 
   return (
@@ -50,10 +42,9 @@ export default function Login({ onLogin }) {
       <h2 className="app-title">📸 Insta Clone</h2>
 
       <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
       />
 
       <input
@@ -63,13 +54,8 @@ export default function Login({ onLogin }) {
         onChange={(e) => setPassword(e.target.value)}
       />
 
-      <button onClick={handleLogin} disabled={loading}>
-        {loading ? "Logging in..." : "Login"}
-      </button>
-
-      <button onClick={handleSignup} disabled={loading}>
-        {loading ? "Creating..." : "Create Account"}
-      </button>
+      <button onClick={login}>Login</button>
+      <button onClick={signup}>Create Account</button>
     </div>
   );
 }
