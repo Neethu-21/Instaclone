@@ -1,143 +1,84 @@
-// Messages.js — Instagram-style DMs using Supabase realtime
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 
 export default function Messages({ user }) {
-  const username = user; // logged-in user (string)
-
-  const [users, setUsers] = useState([]);     // all users except me
-  const [chatId, setChatId] = useState(null); // selected chat
+  const [users, setUsers] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
 
-  // Load user list
   const loadUsers = async () => {
     const { data } = await supabase.from("profiles").select("*");
-    const filtered = (data || []).filter((u) => u.username !== username);
-    setUsers(filtered);
+    setUsers(data || []);
   };
 
-  // Find or create chat
-  const openChat = async (otherUser) => {
-    let { data } = await supabase
-      .from("chats")
-      .select("*")
-      .or(`user1.eq.${username},user2.eq.${username}`);
-
-    let chat = data?.find(
-      (c) =>
-        (c.user1 === username && c.user2 === otherUser) ||
-        (c.user1 === otherUser && c.user2 === username)
-    );
-
-    if (!chat) {
-      const { data: created } = await supabase
-        .from("chats")
-        .insert({ user1: username, user2: otherUser })
-        .select();
-
-      chat = created[0];
-    }
-
-    setChatId(chat.id);
-  };
-
-  // Load chat messages
   const loadMessages = async () => {
-    if (!chatId) return;
+    if (!selectedChat) return;
     const { data } = await supabase
       .from("messages")
       .select("*")
-      .eq("chat_id", chatId);
-
-    const sorted = (data || []).sort((a, b) => a.time - b.time);
-    setMessages(sorted);
+      .eq("chat_id", selectedChat)
+      .order("time", { ascending: true });
+    setMessages(data || []);
   };
 
-  // On mount load users
   useEffect(() => {
     loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Realtime messaging
   useEffect(() => {
-    if (!chatId) return;
-
     loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat]);
 
-    const ch = supabase
-      .channel("messages")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        loadMessages
-      )
-      .subscribe();
-
-    return () => supabase.removeChannel(ch);
-  }, [chatId]);
-
-  // Send DM
   const sendMessage = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || !selectedChat) return;
     await supabase.from("messages").insert({
-      chat_id: chatId,
-      sender: username,
+      chat_id: selectedChat,
+      sender: user.email,
       text,
       time: Date.now(),
     });
     setText("");
+    loadMessages();
   };
 
   return (
     <div className="messages-page">
-      {/* If chat is not opened — show user list */}
-      {!chatId ? (
-        <div className="chat-list">
-          <h3>Messages</h3>
-          {users.map((u) => (
+      <div className="sidebar">
+        {users.map((u) => (
+          <div
+            key={u.id}
+            className="user"
+            onClick={() => setSelectedChat(u.id)}
+          >
+            {u.username}
+          </div>
+        ))}
+      </div>
+
+      <div className="chat">
+        <div className="chat-body">
+          {messages.map((m) => (
             <div
-              key={u.username}
-              className="chat-user"
-              onClick={() => openChat(u.username)}
+              key={m.id}
+              className={m.sender === user.email ? "my-msg" : "other-msg"}
             >
-              <img
-                src={u.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
-                alt=""
-              />
-              <span>@{u.username}</span>
+              {m.text}
             </div>
           ))}
         </div>
-      ) : (
-        // Chat opened — show chat UI
-        <div className="chat-box">
-          <button className="back-btn" onClick={() => setChatId(null)}>
-            ◀ Back
-          </button>
 
-          <div className="chat-messages">
-            {messages.map((m) => (
-              <p
-                key={m.id}
-                className={m.sender === username ? "msg me" : "msg other"}
-              >
-                {m.text}
-              </p>
-            ))}
-          </div>
-
-          <div className="chat-input-row">
-            <input
-              placeholder="Message..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            />
-            <button onClick={sendMessage}>Send</button>
-          </div>
+        <div className="chat-input">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type..."
+          />
+          <button onClick={sendMessage}>Send</button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
